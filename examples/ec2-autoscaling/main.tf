@@ -17,7 +17,6 @@ locals {
   tags = {
     Name        = local.name
     environment = local.environment
-    label_order = local.label_order
     Repository  = "https://github.com/clouddrove/terraform-aws-ecs"
   }
 }
@@ -37,7 +36,7 @@ module "ecs_cluster" {
     # On-demand instances
     ex_1 = {
       auto_scaling_group_arn         = module.autoscaling["ex_1"].autoscaling_group_arn
-      managed_termination_protection = "ENABLED"
+      managed_termination_protection = "DISABLED"
 
       managed_scaling = {
         maximum_scaling_step_size = 5
@@ -76,6 +75,11 @@ module "ecs_cluster" {
 
 module "ecs_service" {
   source = "../../modules/service"
+  
+  desired_count = 0
+  force_delete = true
+  wait_until_stable = false
+
 
   # Service
   name        = local.name
@@ -133,7 +137,7 @@ module "ecs_service" {
 
   load_balancer = {
     service = {
-      target_group_arn = module.lb.main_target_group_arn
+      target_group_arn = module.alb.target_groups["ex_ecs"].arn
       container_name   = local.container_name
       container_port   = local.container_port
     }
@@ -147,7 +151,7 @@ module "ecs_service" {
       to_port                  = local.container_port
       protocol                 = "tcp"
       description              = "Service port"
-      source_security_group_id = module.lb.security_group_id
+      source_security_group_id = module.alb.security_group_id
     }
   }
 }
@@ -187,7 +191,7 @@ module "alb" {
   security_group_egress_rules = {
     all = {
       ip_protocol = "-1"
-      cidr_ipv4   = module.vpc.cidr_ipv4
+      cidr_ipv4   = module.vpc.vpc_cidr_block
     }
   }
 
@@ -230,72 +234,72 @@ module "alb" {
 
   tags = local.tags
 }
-module "ec2-autoscale" {
+
+
+module "iam-role" {
+  source  = "clouddrove/iam-role/aws"
+  version = "~> 1.0"
+
+  name = "${local.name}-ecs-instance-role"
+
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+  ]
+}
+
+data "aws_key_pair" "this" {
+  key_name = "clouddrove-ec2-autoscaling-key"
+}
+
+
+
+
+module "autoscaling" {
   source  = "clouddrove/ec2-autoscaling/aws"
   version = "1.3.3"
 
+  for_each = {
+    ex_1 = { spot = false }
+    ex_2 = { spot = true }
+  }
+
   enabled                   = true
-  name                      = "${local.name}-test"
+  name                      = "${local.name}-${each.key}"
   environment               = local.environment
-  image_id                  = "ami-0ab040d0c6b04cf83"
+  image_id                  = jsondecode(data.aws_ssm_parameter.ecs_optimized_ami.value).image_id
   instance_profile_enabled  = true
   iam_instance_profile_name = module.iam-role.name
 
-  security_group_ids = [module.ssh.security_group_id, module.http_https.security_group_id]
-  user_data_base64   = ""
+  security_group_ids = [module.http_https.security_group_id]
 
-  subnet_ids                              = tolist(module.public_subnets.public_subnet_id)
-  spot_max_size                           = 3
-  spot_min_size                           = 1
-  spot_desired_capacity                   = 1
-  spot_enabled                            = true
-  on_demand_enabled                       = false
-  scheduler_down                          = "0 19 * * MON-FRI"
-  scheduler_up                            = "0 6 * * MON-FRI"
-  spot_min_size_scaledown                 = 1
-  spot_max_size_scaledown                 = 1
-  spot_schedule_enabled                   = false
-  spot_scale_down_desired                 = 1
-  spot_scale_up_desired                   = 2
-  max_price                               = "0.20"
-  volume_size                             = 20
-  ebs_encryption                          = false
-  kms_key_arn                             = ""
-  volume_type                             = "standard"
-  spot_instance_type                      = "m5.large"
-  associate_public_ip_address             = true
-  instance_initiated_shutdown_behavior    = "terminate"
-  key_name                                = module.keypair.name
-  enable_monitoring                       = true
-  load_balancers                          = []
-  health_check_type                       = "EC2"
-  target_group_arns                       = []
-  default_cooldown                        = 150
-  force_delete                            = false
-  termination_policies                    = ["Default"]
-  suspended_processes                     = []
-  enabled_metrics                         = ["GroupMinSize", "GroupMaxSize", "GroupDesiredCapacity", "GroupInServiceInstances", "GroupPendingInstances", "GroupStandbyInstances", "GroupTerminatingInstances", "GroupTotalInstances"]
-  metrics_granularity                     = "1Minute"
-  wait_for_capacity_timeout               = "5m"
-  protect_from_scale_in                   = false
-  service_linked_role_arn                 = ""
-  scale_up_cooldown_seconds               = 150
-  scale_up_scaling_adjustment             = 1
-  scale_up_adjustment_type                = "ChangeInCapacity"
-  scale_up_policy_type                    = "SimpleScaling"
-  scale_down_cooldown_seconds             = 300
-  scale_down_scaling_adjustment           = -1
-  scale_down_adjustment_type              = "ChangeInCapacity"
-  scale_down_policy_type                  = "SimpleScaling"
-  cpu_utilization_high_evaluation_periods = 2
-  cpu_utilization_high_period_seconds     = 300
-  cpu_utilization_high_threshold_percent  = 10
-  cpu_utilization_high_statistic          = "Average"
-  cpu_utilization_low_evaluation_periods  = 2
-  cpu_utilization_low_period_seconds      = 180
-  cpu_utilization_low_statistic           = "Average"
-  cpu_utilization_low_threshold_percent   = 1
+  subnet_ids = module.subnets.public_subnet_id
+
+  spot_enabled = each.value.spot
+
+  # Sizes
+  spot_min_size = 1
+  spot_max_size = 3
+  wait_for_capacity_timeout = "0"
+  
+
+  force_delete = true
+
+
+  volume_size  = 20
+  volume_type  = "standard"
+
+  instance_type       = "m5.large"
+  associate_public_ip_address = true
+  key_name = data.aws_key_pair.this.key_name
+
+
+  protect_from_scale_in = each.value.spot
+
+  cpu_utilization_low_period_seconds = 180
 }
+
+
+
 
 
 #tfsec:ignore:aws-ec2-no-public-egress-sgr
@@ -354,6 +358,8 @@ module "http_https" {
 module "vpc" {
   source  = "clouddrove/vpc/aws"
   version = "2.0.0"
+  enable_network_address_usage_metrics = false
+
 
   name        = "vpc"
   repository  = "https://github.com/clouddrove/terraform-aws-vpc"
@@ -373,13 +379,19 @@ module "subnets" {
   repository          = "https://github.com/clouddrove/terraform-aws-subnet"
   environment         = "test"
   label_order         = ["name", "environment"]
-  nat_gateway_enabled = true
+  igw_id = module.vpc.igw_id
+
+
+  nat_gateway_enabled = false
   availability_zones  = ["eu-west-1a", "eu-west-1b"]
   vpc_id              = module.vpc.vpc_id
   cidr_block          = module.vpc.vpc_cidr_block
   type                = "public-private"
-  igw_id              = module.vpc.igw_id
+  #igw_id              = module.vpc.igw_id
+  enable_flow_log = false
+
   ipv6_cidr_block     = module.vpc.ipv6_cidr_block
+  
 
   private_inbound_acl_rules = [
     {

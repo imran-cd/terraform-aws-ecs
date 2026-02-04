@@ -1,0 +1,38 @@
+{
+    "capacityProviders": [
+        {
+            "capacityProviderArn": "arn:aws:ecs:eu-west-1:272536203213:capacity-provider/FARGATE",
+            "name": "FARGATE",
+            "status": "ACTIVE",
+            "tags": [],
+            "type": "FARGATE"
+        },
+        {
+            "capacityProviderArn": "arn:aws:ecs:eu-west-1:272536203213:capacity-provider/FARGATE_SPOT",
+            "name": "FARGATE_SPOT",
+            "status": "ACTIVE",
+            "tags": [],
+            "type": "FARGATE_SPOT"
+        },
+        {
+            "capacityProviderArn": "arn:aws:ecs:eu-west-1:272536203213:capacity-provider/ex_2",
+            "name": "ex_2",
+            "status": "ACTIVE",
+            "autoScalingGroupProvider": {
+                "autoScalingGroupArn": "arn:aws:autoscaling:eu-west-1:272536203213:autoScalingGroup:dce13238-e19b-4c63-8d16-13f5f925244e:autoScalingGroupName/test-clouddrove-ec2-autoscaling-ex_2-20260202143839142200000008",
+                "managedScaling": {
+                    "status": "ENABLED",
+                    "targetCapacity": 90,
+                    "minimumScalingStepSize": 5,
+                    "maximumScalingStepSize": 15,
+                    "instanceWarmupPeriod": 0
+                },
+                "managedTerminationProtection": "ENABLED",
+                "managedDraining": "ENABLED"
+            },
+            "tags": [],
+            "type": "EC2_AUTOSCALING"
+        }
+    ],
+    "failures": []
+}
