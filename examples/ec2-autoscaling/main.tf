@@ -27,8 +27,10 @@ locals {
 
 module "ecs_cluster" {
   source = "../../modules/cluster"
+  
 
   cluster_name = local.name
+  
 
   # Capacity provider - autoscaling groups
   default_capacity_provider_use_fargate = false
@@ -75,6 +77,13 @@ module "ecs_cluster" {
 
 module "ecs_service" {
   source = "../../modules/service"
+
+  
+
+  attributes = ["ecs", "service"]
+
+  tags = local.tags
+
   
   desired_count = 0
   force_delete = true
@@ -168,6 +177,7 @@ data "aws_ssm_parameter" "ecs_optimized_ami" {
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
+  
 
   name = local.name
 
@@ -239,6 +249,7 @@ module "alb" {
 module "iam-role" {
   source  = "clouddrove/iam-role/aws"
   version = "~> 1.0"
+  repository = "https://github.com/clouddrove/terraform-aws-ecs"
 
   name = "${local.name}-ecs-instance-role"
 
@@ -257,6 +268,7 @@ data "aws_key_pair" "this" {
 module "autoscaling" {
   source  = "clouddrove/ec2-autoscaling/aws"
   version = "1.3.3"
+  repository = "https://github.com/clouddrove/terraform-aws-ecs"
 
   for_each = {
     ex_1 = { spot = false }
@@ -306,6 +318,7 @@ module "autoscaling" {
 module "http_https" {
   source  = "clouddrove/security-group/aws"
   version = "2.0.0"
+  repository = "https://github.com/clouddrove/terraform-aws-ecs"
 
   name        = "${local.name}-http-https"
   environment = local.environment
@@ -374,6 +387,7 @@ module "vpc" {
 module "subnets" {
   source  = "clouddrove/subnet/aws"
   version = "2.0.1"
+ 
 
   name                = "subnets"
   repository          = "https://github.com/clouddrove/terraform-aws-subnet"
