@@ -20,7 +20,7 @@ locals {
     { for k, v in {
       logDriver = "awslogs",
       options = {
-        awslogs-region        = data.aws_region.current.name,
+        awslogs-region        = data.aws_region.current.id,
         awslogs-group         = try(aws_cloudwatch_log_group.this[0].name, ""),
         awslogs-stream-prefix = "ecs"
       },
@@ -90,5 +90,8 @@ resource "aws_cloudwatch_log_group" "this" {
   retention_in_days = var.cloudwatch_log_group_retention_in_days
   kms_key_id        = var.cloudwatch_log_group_kms_key_id
 
-  tags = module.labels.tags
+  tags = {
+  Name       = var.cloudwatch_log_group_name
+  Repository = "https://github.com/clouddrove/terraform-aws-ecs"
+  }
 }

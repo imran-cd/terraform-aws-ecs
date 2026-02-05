@@ -704,3 +704,10 @@ variable "security_group_tags" {
   type        = map(string)
   default     = {}
 }
+
+
+variable "tags" {
+  type        = map(string)
+  description = "Tags for ECS service and related resources"
+  default     = {}
+}

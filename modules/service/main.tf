@@ -5,7 +5,7 @@ data "aws_caller_identity" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
-  region     = data.aws_region.current.name
+  region     = data.aws_region.current.id
 }
 
 ################################################################################
@@ -37,6 +37,7 @@ module "labels" {
   delimiter   = var.delimiter
   attributes  = compact(concat(var.attributes, ["cluster"]))
   label_order = var.label_order
+  repository  = "https://github.com/clouddrove/terraform-aws-ecs"
 }
 
 resource "aws_service_discovery_private_dns_namespace" "this" {
@@ -633,7 +634,7 @@ module "container_definition" {
   cloudwatch_log_group_retention_in_days = try(each.value.cloudwatch_log_group_retention_in_days, var.container_definition_defaults.cloudwatch_log_group_retention_in_days, 14)
   cloudwatch_log_group_kms_key_id        = try(each.value.cloudwatch_log_group_kms_key_id, var.container_definition_defaults.cloudwatch_log_group_kms_key_id, null)
 
-  tags = module.labels.tags
+  tags = var.tags
 }
 
 ################################################################################

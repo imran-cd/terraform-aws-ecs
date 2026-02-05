@@ -25,6 +25,7 @@ module "labels" {
   delimiter   = var.delimiter
   attributes  = compact(concat(var.attributes, ["cluster"]))
   label_order = var.label_order
+  repository = "https://github.com/clouddrove/terraform-aws-ecs"
 }
 
 resource "aws_ecs_cluster" "this" {
@@ -58,11 +59,11 @@ resource "aws_ecs_cluster" "this" {
       }
 
       dynamic "managed_storage_configuration" {
-        for_each = try([merge(local.managed_storage_configuration, configuration.value.managed_storage_configuration)], [{}])
+        for_each = var.kms_key_id != null ? [merge(local.managed_storage_configuration, try(configuration.value.managed_storage_configuration, {}))] : []
 
         content {
-          kms_key_id                           = try(managed_storage_configuration.value.kms_key_id, null)
-          fargate_ephemeral_storage_kms_key_id = try(managed_storage_configuration.value.fargate_ephemeral_storage_kms_key_id, null)
+          kms_key_id                           = managed_storage_configuration.value.kms_key_id
+          fargate_ephemeral_storage_kms_key_id = managed_storage_configuration.value.fargate_ephemeral_storage_kms_key_id
         }
       }
     }
@@ -104,7 +105,7 @@ resource "aws_ecs_cluster" "this" {
   }
 
   dynamic "setting" {
-    for_each = flatten([var.cluster_settings])
+    for_each = length(var.cluster_settings) > 0 ? flatten([var.cluster_settings]) : []
 
     content {
       name  = setting.value.name
